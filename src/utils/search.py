@@ -1,99 +1,68 @@
-#!/usr/bin/python
-#
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specif5ic language governing permissions and
-# limitations under the License.
-
-import embedding
-import matching
-import lookup
-import os
 import logging
-import googleapiclient
-from httplib2 import Http
-from oauth2client.client import GoogleCredentials
+import pandas as pd
+from scipy.stats import stats
 
-# Configurable parameters
-GCS_BUCKET = ''
-KIND = 'wikipedia'
-GCS_INDEX_LOCATION = '{}/index/embeds.index'.format(KIND)
-INDEX_FILE = 'embeds.index'
-CHUNKSIZE = 16 * 1024 * 1024
+from src.app.Types import Matches, Embed, Profile
+from src.pipelines import UpdateModel
+from src.pipelines.Options import encoded_attributes, query_attributes, VECTOR_LENGTH
+from src.utils.embedding import EmbedUtil
+from src.utils.matching import MatchingUtil
+from fastapi.encoders import jsonable_encoder
 
-
-def _download_from_gcs(gcs_services, bucket_name, gcs_location, local_file_name):
-
-  print('Downloading file {} to {}...'.format(
-    'gs://{}/{}'.format(bucket_name, gcs_location), local_file_name))
-
-  with open(local_file_name, 'wb') as file_writer:
-    request = gcs_services.objects().get_media(
-      bucket=bucket_name, object=gcs_location)
-    media = googleapiclient.http.MediaIoBaseDownload(
-      file_writer, request, chunksize=CHUNKSIZE)
-    download_complete = False
-    while not download_complete:
-        progress, download_complete = media.next_chunk()
-
-  print('File {} downloaded to {}.'.format(
-    'gs://{}/{}'.format(bucket_name, gcs_location), local_file_name))
-
-  print('File size: {} GB'.format(
-    round(os.path.getsize(local_file_name) / float(1024 ** 3), 2)))
+logging.getLogger().setLevel(logging.INFO)
 
 
-def download_artefacts(index_file, bucket_name, gcs_index_location):
-  http = Http()
-  credentials = GoogleCredentials.get_application_default()
-  credentials.authorize(http)
-  gcs_services = googleapiclient.discovery.build('storage', 'v1', http=http)
-  _download_from_gcs(gcs_services, bucket_name, gcs_index_location, index_file)
-  _download_from_gcs(gcs_services, bucket_name,
-                     gcs_index_location + '.mapping', index_file + '.mapping')
+def load_from_json(data):
+    df = pd.DataFrame()
+    normalized = pd.json_normalize(jsonable_encoder(data))
+    df = pd.concat([df, normalized])
+    return df
 
 
-class SearchUtil:
+class Controller:
 
-  def __init__(self):
+    @staticmethod
+    def embed_query(index_file, embed, num_limit=100) -> any:
+        match = MatchingUtil(index_file)
+        m = match.find_similar_items(embed, num_limit)
+        logging.info(m)
 
-    print('Initialising search utility...')
+        if m is None:
+            raise Exception("Could not create hash from given properties")
+        return Matches(matches=m)
 
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    index_file = os.path.join(dir_path, INDEX_FILE)
+    @staticmethod
+    def attributes_query(index_file, properties, num_limit=100) -> any:
+        match = MatchingUtil(index_file)
+        embed = EmbedUtil(use_encoder=True).extract_embeddings(load_from_json(properties))[0]
+        m = match.find_similar_items(embed, num_limit)
+        logging.info(m)
 
-    print('Downloading index artefacts...')
-    download_artefacts(index_file, GCS_BUCKET, GCS_INDEX_LOCATION)
-    print('Index artefacts downloaded.')
+        if m is None:
+            raise Exception("Could not create hash from given properties")
+        return Matches(matches=m)
 
-    print('Initialising matching util...')
-    self.match_util = matching.MatchingUtil(index_file)
-    print('Matching util initialised.')
+    @staticmethod
+    def embed_by_ids(cert, ids) -> any:
+        df = UpdateModel.by_ids(cert, ids)
+        df.drop(df.columns.difference(query_attributes), 1, inplace=True)
 
-    print('Initialising embedding util...')
-    self.embed_util = embedding.EmbedUtil()
-    print('Embedding util initialised.')
+        embed_util = EmbedUtil(use_encoder=True)
+        embeds = embed_util.extract_embeddings(df)
+        embed = []
+        profile = []
+        index = 0
+        mode = stats.mode(embeds)[0][0]
+        median = stats.median_abs_deviation(embeds)
+        for atr in query_attributes:
+            if atr in encoded_attributes:
+                embed.append(mode[index])
+                profile.append(embed_util.inverse_transform(atr, mode[index]))
+            else:
+                embed.append(median[index])
+                profile.append(median[index])
+            index += 1
 
-    print('Initialising datastore util...')
-    self.datastore_util = lookup.DatastoreUtil(KIND)
-    print('Datastore util is initialised.')
-
-    print('Search utility is up and running.')
-
-  def search(self, query, num_matches=10):
-    query_embedding = self.embed_util.extract_embeddings(query)
-    item_ids = self.match_util.find_similar_items(query_embedding, num_matches)
-    items = self.datastore_util.get_items(item_ids)
-    return items
-
-
-
+        if len(embed) != VECTOR_LENGTH:
+            raise Exception("Could not create hash for given ids")
+        return Profile(embed=embed, profile=profile)

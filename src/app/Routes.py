@@ -7,7 +7,7 @@ from functools import lru_cache
 from starlette.requests import Request
 
 from src.app.App import *
-from src.pipelines.Controller import Controller
+from src.utils.search import Controller
 from src.pipelines.Options import index_filename
 from src.pipelines.UpdateModel import run, fit
 from src.app.Types import Matches, Query, Embed, Profile
