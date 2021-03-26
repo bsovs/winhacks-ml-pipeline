@@ -1,7 +1,7 @@
 [![Annoy](https://badgen.net/badge/Powered%20by/Annoy/blue)](https://github.com/spotify/annoy)
 
 # winhacks ml pipeline
-This is a reference encoder an recommendation system created for winhacks 2021.
+This is a reference encoder for a home recommendation system created for winhacks 2021.
 
 ## About
 ### Encoder
@@ -10,6 +10,7 @@ This is a reference encoder an recommendation system created for winhacks 2021.
 - Each row is converted to a vector and added to the annoy index
 - X trees are created with these vectors to the n nearest neighbours can be looked up very quick in memory
 
+## FastApi App
 ### Endpoints Available
 - `/run/model/update` (update annoy model for all homes)
 - `/run/model/fit` (update collaborative rating in bigQuery) *needs payed deployment
