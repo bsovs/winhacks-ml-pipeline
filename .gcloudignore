@@ -1,0 +1,6 @@
+.env
+.temp
+venv
+test.py
+Procfile
+app.json

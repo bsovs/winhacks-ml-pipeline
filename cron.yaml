@@ -1,0 +1,8 @@
+cron:
+  - description: "refresh model"
+    url: /run/model/update?num_limit=1000&num_trees=10
+    schedule: every 60 mins
+    retry_parameters:
+      job_retry_limit: 1
+      min_backoff_seconds: 2.5
+      max_doublings: 5

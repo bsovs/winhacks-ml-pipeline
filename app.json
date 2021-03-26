@@ -1,0 +1,13 @@
+{
+  "name": "ML BQ PIPELINE + API GATEWAY",
+  "description": "A barebones Python API",
+  "image": "heroku/python",
+  "keywords": ["python", "fastapi" ],
+  "env": {
+  },
+  "environments": {
+    "test": {
+      "scripts": {}
+    }
+  }
+}

@@ -1,0 +1,8 @@
+.env
+.temp
+../../python/venv
+test.py
+Procfile
+src/.datasets/*
+venv
+.idea
