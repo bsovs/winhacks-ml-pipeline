@@ -30,3 +30,6 @@ class MatchingUtil:
         vectors = [np.array(self.index.get_item_vector(item))
                    for item in items]
         return vectors
+
+    def get_index(self):
+        return self.index

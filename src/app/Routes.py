@@ -30,6 +30,12 @@ async def ping(request: Request):
     return 'pong'
 
 
+@app.get("/inspect/model", tags=["inspect"])
+@limiter.limit("100/minute")
+async def inspect(request: Request):
+    return Controller.inspect(index_filename)
+
+
 @app.get("/run/model/update", tags=["pipeline"])
 @limiter.limit("3/minute")
 async def run_model(request: Request, num_limit: Optional[int] = 1000, num_trees: Optional[int] = 100, settings: config.Settings = Depends(get_settings)):

@@ -22,6 +22,13 @@ def load_from_json(data):
 class Controller:
 
     @staticmethod
+    def inspect(index_file) -> any:
+        match = MatchingUtil(index_file)
+        index = match.get_index()
+        df = pd.DataFrame((index.get_item_vector(i) for i in range(index.get_n_items())), columns=query_attributes)
+        return {"describe": df.describe(include='all'), "example": df.head(1)}
+
+    @staticmethod
     def embed_query(index_file, embed, num_limit=100) -> any:
         match = MatchingUtil(index_file)
         m = match.find_similar_items(embed, num_limit)
